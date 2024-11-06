@@ -1,21 +1,25 @@
 # services/wordpress_publisher.py
 
-import requests
-from requests.auth import HTTPBasicAuth
+
+from wordpress_xmlrpc import Client, WordPressPost
+from wordpress_xmlrpc.methods import posts
 from config.settings import WORDPRESS_SITE_URL, WORDPRESS_USERNAME, WORDPRESS_PASSWORD
 
+# Create a WordPress client
+wp = Client(WORDPRESS_SITE_URL, WORDPRESS_USERNAME, WORDPRESS_PASSWORD)
+
+
 def publish_to_wordpress(title, content, status="draft"):
-    url = f"{WORDPRESS_SITE_URL}/wp-json/wp/v2/posts"
-    auth = HTTPBasicAuth(WORDPRESS_USERNAME, WORDPRESS_PASSWORD)
     
-    data = {
-        "title": title,
-        "content": content,
-        "status": status,
-    }
-    
-    response = requests.post(url, json=data, auth=auth)
-    response.raise_for_status()
-    
-    post_id = response.json().get("id")
-    return post_id
+    # Create a new post
+    post = WordPressPost()
+    post.title = title
+    post.content = content
+    post.post_status = status
+
+    # Publish the post
+    wp.call(posts.NewPost(post))
+
+
+
+

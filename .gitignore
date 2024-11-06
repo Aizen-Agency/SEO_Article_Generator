@@ -1,0 +1,71 @@
+# Python specific files
+*.py[cod]
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+*.pyd
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+.idea/
+
+# VSCode settings
+.vscode/
+
+# PyCharm settings
+.idea/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Static files and cache
+static/
+media/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp4
+*.avi
+
+# FastAPI auto-generated folders (if applicable)
+__pypackages__/
+
+# Ignore test and coverage results
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.*
+.cache
+pytest_cache/
+nosetests.xml
+test_*.py
+tests/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# Docker specific
+docker-compose.override.yml
+Dockerfile
+.dockerignore
+
+# MyPy and Pylint cache
+.mypy_cache/
+.pyre/
+.pytype/
+pylint.log
+
+# Ignore local development scripts or tools
+local_settings.py
