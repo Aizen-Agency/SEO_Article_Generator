@@ -1,3 +1,11 @@
 requests
 openai
 python-dotenv
+argparse
+python-docx
+openai
+requests
+ollama
+deep-translator
+Flask
+flask-cors
