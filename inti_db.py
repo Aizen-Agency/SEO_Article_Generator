@@ -1,5 +1,6 @@
 from main import app, db, User  # Import your Flask app and the SQLAlchemy instance
 from sqlalchemy.sql import text
+from sqlalchemy.exc import SQLAlchemyError
 
 
 # Create the tables based on the models defined in your app
