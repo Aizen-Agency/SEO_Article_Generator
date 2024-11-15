@@ -9,3 +9,7 @@ ollama
 deep-translator
 Flask
 flask-cors
+psycopg2-binary
+flask-sqlalchemy
+pyjwt
+psycopg2

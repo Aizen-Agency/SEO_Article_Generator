@@ -16,7 +16,7 @@ def generate_content(topic, tone="informative", style="blog", length="medium"):
             {"role": "user", "content": prompt},
         ]
     )
-    print(response)
+    # print(response)
     content = response.choices[0].message.content
 
     return content

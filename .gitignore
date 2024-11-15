@@ -69,3 +69,6 @@ pylint.log
 
 # Ignore local development scripts or tools
 local_settings.py
+*.jpg
+*.jpeg
+*.png
