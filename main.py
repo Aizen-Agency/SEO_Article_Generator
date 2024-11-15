@@ -18,15 +18,22 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 import asyncio
 import threading
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from a .env file
+load_dotenv()
 
 # Initialize Flask app, DB, and other services
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://admin:pgpassword@localhost:5434/mindmate'  # Replace with actual database URI
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')  # Default fallback if the env variable is not set
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'somesecretkey'  # Secret key for encoding/decoding JWT
-app.config['S3_BUCKET'] = 'aizenstorage'
-app.config['AWS_ACCESS_KEY_ID'] = 'AKIAXYKJUVWLYBWWVLUA'
-app.config['AWS_SECRET_ACCESS_KEY'] = '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'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')  # Secret key for encoding/decoding JWT
+app.config['S3_BUCKET'] = os.getenv('S3_BUCKET')
+app.config['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
+app.config['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 CORS(app)
 db = SQLAlchemy(app)
