@@ -1,0 +1,1 @@
+web: python inti_db.py && python main.py
