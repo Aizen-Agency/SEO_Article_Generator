@@ -59,6 +59,7 @@ class User(db.Model):
     wordpress_site_url = db.Column(db.String(255), nullable=True)
     wordpress_username = db.Column(db.String(255), nullable=True)
     wordpress_password = db.Column(db.String(255), nullable=True)
+    keywords = db.Column(db.String(255), nullable=True)
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -73,8 +74,7 @@ class BlogPost(db.Model):
     status = db.Column(db.String(50), default='draft')  # draft, scheduled, published, unapproved
     publish_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    keywords = db.Column(db.String(255), nullable=True)
-
+    image_url = db.Column(db.String(255), nullable=True)
 # Utility function to encode JWT token
 def encode_auth_token(user_id):
     try:
@@ -129,11 +129,10 @@ def get_post_stats(user):
         
         # Count total keywords across all posts
         total_keywords = 0
-        for post in blog_posts:
-            if post.keywords:
-                # Split keywords string by comma and count non-empty keywords
-                keywords_list = [k.strip() for k in post.keywords.split(',') if k.strip()]
-                total_keywords += len(keywords_list)
+        if user.keywords:
+            # Split keywords string by comma and count non-empty keywords
+            keywords_list = [k.strip() for k in user.keywords.split(',') if k.strip()]
+            total_keywords += len(keywords_list)
 
         # Return the counts as a JSON response
         return jsonify({
@@ -158,18 +157,31 @@ def schedule_trigger_in_thread(blog_post_id, delay_seconds):
 @app.route('/generate-blog', methods=['POST'])
 @token_required
 def generate_blog(user):
-    data = request.get_json()
-    title = data.get('title')
+    print(request.form)
+    data = request.form
     content_key_points = data.get('content')
+    prompt = data.get('prompt')
     publish_date_str = data.get('publish_date')
-    keywords = data.get('keywords')
+    keywords = user.keywords
     keywords = keywords.split(',') if keywords else []
 
-    if not title or not content_key_points:
-        return jsonify({"error": "Title and content key points are required"}), 400
+    # Define allowed file extensions for images
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+    def allowed_file(filename):
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     try:
-        content = generate_content(content_key_points)
+        # Log the received image file
+        if 'image' in request.files:
+            image = request.files['image']
+        else:
+            print("No image file received")
+
+        response = generate_content(content_key_points, prompt=prompt) if prompt else generate_content(content_key_points)
+        title = response['title']
+        content = response['content']
         updated_content = optimize_for_seo(content, keywords)
         publish_date = None
         if publish_date_str:
@@ -178,6 +190,23 @@ def generate_blog(user):
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use ISO format: YYYY-MM-DDTHH:MM:SS"}), 400
 
+        # Handle image upload
+        image_url = None
+        if 'image' in request.files:
+            image = request.files['image']
+            if image and allowed_file(image.filename):
+                filename = secure_filename(image.filename)
+                try:
+                    s3.upload_fileobj(
+                        image,
+                        app.config['S3_BUCKET'],
+                        filename,
+                        ExtraArgs={'ContentType': image.content_type}
+                    )
+                    image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{filename}"
+                except Exception as e:
+                    return jsonify({"error": f"Error uploading image to S3: {str(e)}"}), 500
+
         blog_post = BlogPost(
             user_id=user.id,
             title=title,
@@ -185,42 +214,44 @@ def generate_blog(user):
             updated_content=updated_content,
             status='unapproved',
             publish_date=publish_date,
-            keywords=','.join(keywords)
+            image_url=image_url
         )
         
         db.session.add(blog_post)
         db.session.commit()
 
-        return jsonify({"message": "Blog post generated successfully and marked as unapproved", "post_id": blog_post.id}), 200
+        return jsonify({
+            "message": "Blog post generated successfully and marked as unapproved",
+            "post_id": blog_post.id,
+            "image_url": image_url
+        }), 200
     except Exception as e:
         return jsonify({"error": f"Error generating blog: {str(e)}"}), 500
-
+    
+    
 @app.route('/update-blog-keywords', methods=['POST'])
 @token_required
 def update_blog_keywords(user):
     data = request.get_json()
-    post_id = data.get('post_id')
     new_keywords = data.get('keywords')
-    print(new_keywords)
     new_keywords = new_keywords.split(',') if new_keywords else []
-    print(new_keywords)
-    if not post_id or not new_keywords:
-        return jsonify({"error": "Post ID and new keywords are required"}), 400
-
     try:
-        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id).first()
-        if not blog_post:
-            return jsonify({"error": "Blog post not found or you don't have permission to edit it"}), 404
-
-        optimized_content = optimize_for_seo(blog_post.content, new_keywords)
-        blog_post.updated_content = optimized_content
-        blog_post.keywords = ','.join(new_keywords)
-        
+        user.keywords = ','.join(new_keywords)
         db.session.commit()
-
-        return jsonify({"message": "Blog post updated successfully with new keywords"}), 200
+        return jsonify({"message": "User keywords updated successfully"}), 200
     except Exception as e:
-        return jsonify({"error": f"Error updating blog post: {str(e)}"}), 500
+        return jsonify({"error": f"Error updating user keywords: {str(e)}"}), 500
+
+@app.route('/get-blog-keywords', methods=['GET']) 
+@token_required
+def get_blog_keywords(user):
+    try:
+        keywords = user.keywords.split(',') if user.keywords else []
+        return jsonify({
+            "keywords": keywords
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Error fetching user keywords: {str(e)}"}), 500
     
 @app.route('/approve-and-publish', methods=['POST'])
 @token_required
@@ -244,7 +275,8 @@ def approve_and_publish(user):
                 wp_site_url=user.wordpress_site_url,
                 wp_username=user.wordpress_username,
                 status="publish",
-                publish_date=blog_post.publish_date
+                publish_date=blog_post.publish_date,
+                image_url=blog_post.image_url  # Send image_url to WordPress
             )
             if not post_url:
                 return jsonify({"error": "Failed to publish the blog to WordPress"}), 500
@@ -451,8 +483,7 @@ def get_user_blogs(user):
                 "updated_content": blog.updated_content,
                 "status": blog.status,
                 "publish_date": blog.publish_date.isoformat() if blog.publish_date else None,
-                "created_at": blog.created_at.isoformat(),
-                "keywords": blog.keywords.split(',') if blog.keywords else []
+                "created_at": blog.created_at.isoformat()
             })
         
         return jsonify({

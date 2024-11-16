@@ -16,3 +16,4 @@ psycopg2
 flask_bcrypt
 python-wordpress-xmlrpc
 boto3
+requests
