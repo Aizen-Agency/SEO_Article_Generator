@@ -13,3 +13,4 @@ psycopg2-binary
 flask-sqlalchemy
 pyjwt
 psycopg2
+flask_bcrypt
