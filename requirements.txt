@@ -14,4 +14,4 @@ flask-sqlalchemy
 pyjwt
 psycopg2
 flask_bcrypt
-wordpress_xmlrpc
+python-wordpress-xmlrpc
