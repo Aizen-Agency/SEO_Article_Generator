@@ -36,9 +36,15 @@ app.config['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
 app.config['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 
-allowed_origins = ["https://your-frontend-domain.com", "http://localhost:3000/", "http://127.0.0.1:3000/"]
+allowed_origins = [
+    "https://your-frontend-domain.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
 
-CORS(app, resources={r"/*": {"origins": allowed_origins}}, supports_credentials=True)
+# CORS(app, resources={r"/*": {"origins": allowed_origins}}, supports_credentials=True)
+CORS(app, resources=r"/*", origins=allowed_origins, supports_credentials=True)
+
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
