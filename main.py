@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
-from services.content_generator import generate_content
+from services.content_generator import generate_content, optimize_for_seo
 from services.wordpress_publisher import publish_to_wordpress
 from services.naver_sharer import share_to_naver
 from datetime import datetime
@@ -61,9 +61,11 @@ class BlogPost(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(50), default='draft')  # draft, scheduled, published
+    updated_content = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), default='draft')  # draft, scheduled, published, unapproved
     publish_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    keywords = db.Column(db.String(255), nullable=True)
 
 # Utility function to encode JWT token
 def encode_auth_token(user_id):
@@ -105,7 +107,6 @@ def token_required(f):
         return f(user, *args, **kwargs)
     return decorator
 
-
 @app.route('/user/post-stats', methods=['GET'])
 @token_required
 def get_post_stats(user):
@@ -113,12 +114,26 @@ def get_post_stats(user):
         # Fetch the counts for published and scheduled posts
         published_count = BlogPost.query.filter_by(user_id=user.id, status='published').count()
         scheduled_count = BlogPost.query.filter_by(user_id=user.id, status='scheduled').count()
+        unapproved_count = BlogPost.query.filter_by(user_id=user.id, status='unapproved').count()
+
+        # Get all blog posts for this user
+        blog_posts = BlogPost.query.filter_by(user_id=user.id).all()
         
+        # Count total keywords across all posts
+        total_keywords = 0
+        for post in blog_posts:
+            if post.keywords:
+                # Split keywords string by comma and count non-empty keywords
+                keywords_list = [k.strip() for k in post.keywords.split(',') if k.strip()]
+                total_keywords += len(keywords_list)
+
         # Return the counts as a JSON response
         return jsonify({
             "user_id": user.id,
             "published_posts": published_count,
-            "scheduled_posts": scheduled_count
+            "scheduled_posts": scheduled_count,
+            "unapproved_posts": unapproved_count,
+            "totalSEOKeywords": total_keywords
         }), 200
 
     except Exception as e:
@@ -139,14 +154,15 @@ def generate_blog(user):
     title = data.get('title')
     content_key_points = data.get('content')
     publish_date_str = data.get('publish_date')
+    keywords = data.get('keywords')
+    keywords = keywords.split(',') if keywords else []
 
     if not title or not content_key_points:
         return jsonify({"error": "Title and content key points are required"}), 400
 
     try:
         content = generate_content(content_key_points)
-        publish_date = None
-        # Step 2: Convert publish_date to datetime if provided
+        updated_content = optimize_for_seo(content, keywords)
         publish_date = None
         if publish_date_str:
             try:
@@ -154,37 +170,100 @@ def generate_blog(user):
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use ISO format: YYYY-MM-DDTHH:MM:SS"}), 400
 
-        # Step 3: Publish to WordPress
-        post_title = f"Blog on {title}" 
-        # Optional: Post the generated content to WordPress (if the user has WordPress credentials)
-        if user.wordpress_site_url and user.wordpress_username and user.wordpress_password:
-            post_id = publish_to_wordpress(title=post_title, content=content, wp_password=user.wordpress_password, wp_site_url= user.wordpress_site_url, wp_username=user.wordpress_username,  status="future" if publish_date else "publish", publish_date=publish_date)
-            if not post_id:
-                return jsonify({"error": "Failed to publish the blog to WordPress"}), 500
-
         blog_post = BlogPost(
             user_id=user.id,
             title=title,
-            content=content_key_points,
-            status='scheduled' if publish_date else 'published',
-            publish_date=publish_date
+            content=content,
+            updated_content=updated_content,
+            status='unapproved',
+            publish_date=publish_date,
+            keywords=','.join(keywords)
         )
         
         db.session.add(blog_post)
         db.session.commit()
 
-        delay = (publish_date - datetime.utcnow().replace(tzinfo=timezone.utc)).total_seconds()
-        if delay < 0:
-            delay = 0
-        # Schedule PostgreSQL trigger if publish_date exists
-        if publish_date:
-             # Use threading to run the task
-            thread = threading.Thread(target=schedule_trigger_in_thread, args=(blog_post.id, delay))
-            thread.start()
-
-        return jsonify({"message": "Blog post generated successfully"}), 200
+        return jsonify({"message": "Blog post generated successfully and marked as unapproved", "post_id": blog_post.id}), 200
     except Exception as e:
         return jsonify({"error": f"Error generating blog: {str(e)}"}), 500
+
+@app.route('/update-blog-keywords', methods=['POST'])
+@token_required
+def update_blog_keywords(user):
+    data = request.get_json()
+    post_id = data.get('post_id')
+    new_keywords = data.get('keywords')
+    print(new_keywords)
+    new_keywords = new_keywords.split(',') if new_keywords else []
+    print(new_keywords)
+    if not post_id or not new_keywords:
+        return jsonify({"error": "Post ID and new keywords are required"}), 400
+
+    try:
+        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to edit it"}), 404
+
+        optimized_content = optimize_for_seo(blog_post.content, new_keywords)
+        blog_post.updated_content = optimized_content
+        blog_post.keywords = ','.join(new_keywords)
+        
+        db.session.commit()
+
+        return jsonify({"message": "Blog post updated successfully with new keywords"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error updating blog post: {str(e)}"}), 500
+    
+@app.route('/approve-and-publish', methods=['POST'])
+@token_required
+def approve_and_publish(user):
+    data = request.get_json()
+    post_id = data.get('post_id')
+
+    if not post_id:
+        return jsonify({"error": "Post ID is required"}), 400
+
+    try:
+        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id, status='unapproved').first()
+        if not blog_post:
+            return jsonify({"error": "Unapproved blog post not found or you don't have permission to approve it"}), 404
+
+        if user.wordpress_site_url and user.wordpress_username and user.wordpress_password:
+            post_url = publish_to_wordpress(
+                title=blog_post.title,
+                content=blog_post.content,
+                wp_password=user.wordpress_password,
+                wp_site_url=user.wordpress_site_url,
+                wp_username=user.wordpress_username,
+                status="publish",
+                publish_date=blog_post.publish_date
+            )
+            if not post_url:
+                return jsonify({"error": "Failed to publish the blog to WordPress"}), 500
+            
+            if blog_post.publish_date:
+                blog_post.status = 'scheduled'
+            else:
+                blog_post.status = 'published'
+            db.session.commit()
+            
+            if blog_post.publish_date:
+                current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+                if blog_post.publish_date.replace(tzinfo=timezone.utc) > current_time:
+                    delay = (blog_post.publish_date.replace(tzinfo=timezone.utc) - current_time).total_seconds()
+                else:
+                    delay = 0
+                # Schedule PostgreSQL trigger if publish_date exists
+                # Use threading to run the task
+                thread = threading.Thread(target=schedule_trigger_in_thread, args=(blog_post.id, delay))
+                thread.start()
+
+            return jsonify({"message": "Blog post approved and published successfully", "wordpress_url": post_url}), 200
+        else:
+            return jsonify({"error": "WordPress credentials are missing"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Error approving and publishing blog post: {str(e)}"}), 500
 
 # Asynchronous trigger function
 async def schedule_trigger(blog_post_id, delay_seconds):
@@ -340,6 +419,41 @@ def manage_wordpress_credentials(user):
         db.session.commit()
 
         return jsonify({"message": "WordPress credentials removed successfully"}), 200
-    
+
+@app.route('/user/blogs', methods=['GET'])
+@token_required
+def get_user_blogs(user):
+    try:
+        # Get the status parameter from the query string
+        status = request.args.get('status', 'unapproved')
+        
+        # Validate the status parameter
+        valid_statuses = ['unapproved', 'approved', 'scheduled', 'published']
+        if status not in valid_statuses:
+            return jsonify({"error": "Invalid status parameter"}), 400
+        # Fetch blogs for the logged-in user with the specified status
+        blogs = BlogPost.query.filter_by(user_id=user.id, status=status).all()
+        # Prepare the response
+        blog_list = []
+        for blog in blogs:
+            blog_list.append({
+                "id": blog.id,
+                "title": blog.title,
+                "content": blog.content,
+                "updated_content": blog.updated_content,
+                "status": blog.status,
+                "publish_date": blog.publish_date.isoformat() if blog.publish_date else None,
+                "created_at": blog.created_at.isoformat(),
+                "keywords": blog.keywords.split(',') if blog.keywords else []
+            })
+        
+        return jsonify({
+            "user_id": user.id,
+            "status": status,
+            "blogs": blog_list
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error fetching user blogs: {str(e)}"}), 500
 if __name__ == '__main__':
     app.run(debug=True)

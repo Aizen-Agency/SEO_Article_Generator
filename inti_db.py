@@ -15,9 +15,9 @@ with app.app_context():
                 CREATE OR REPLACE FUNCTION update_blog_post_status()
                 RETURNS trigger AS $$
                 BEGIN
-                    -- Update the status to 'scheduled' once the trigger is fired
+                    -- Update the status to 'unapproved' once the trigger is fired
                     UPDATE public.blog_post
-                    SET status = 'scheduled'
+                    SET status = 'unapproved'
                     WHERE id = NEW.id;
                     RETURN NEW;
                 END;
