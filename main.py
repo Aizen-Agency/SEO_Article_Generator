@@ -27,8 +27,13 @@ load_dotenv()
 # Initialize Flask app, DB, and other services
 app = Flask(__name__)
 
+database_url = os.getenv('DATABASE_URL')
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # Default fallback if the env variable is not set
+# Replace "postgres://" with "postgresql+psycopg2://" for SQLAlchemy compatibility
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url  # Default fallback if the env variable is not set
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')  # Secret key for encoding/decoding JWT
 app.config['S3_BUCKET'] = os.getenv('S3_BUCKET')
