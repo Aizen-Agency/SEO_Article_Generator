@@ -35,8 +35,13 @@ app.config['S3_BUCKET'] = os.getenv('S3_BUCKET')
 app.config['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
 app.config['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
+# Enable CORS globally with custom options
+CORS(app, 
+    origins="*",                   # Allow all origins
+    methods=["GET", "POST"],       # Allow only GET and POST requests
+    supports_credentials=True      # Allow credentials (e.g., cookies)
+)
 
-CORS(app)
 
 
 db = SQLAlchemy(app)
