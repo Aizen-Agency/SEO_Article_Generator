@@ -35,7 +35,9 @@ app.config['S3_BUCKET'] = os.getenv('S3_BUCKET')
 app.config['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
 app.config['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-CORS(app)
+# Configure CORS
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
