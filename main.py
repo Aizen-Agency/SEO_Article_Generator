@@ -499,6 +499,29 @@ def get_user_blogs(user):
 
     except Exception as e:
         return jsonify({"error": f"Error fetching user blogs: {str(e)}"}), 500
+
+@app.route('/update-blog-content', methods=['PUT'])
+@token_required
+def update_blog_content(user):
+    try:
+        data = request.get_json()
+        blog_id = data.get('post_id')
+        updated_content = data.get('content')
+
+        if not blog_id or not updated_content:
+            return jsonify({"error": "Blog ID and updated content are required"}), 400
+
+        blog_post = BlogPost.query.filter_by(id=blog_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to update it"}), 404
+
+        blog_post.updated_content = updated_content
+        db.session.commit()
+
+        return jsonify({"message": "Blog content updated successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating blog content: {str(e)}"}), 500
     
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
