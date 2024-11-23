@@ -541,12 +541,10 @@ def update_publish_date(user):
         if publish_date:
             try:
                 blog_post.publish_date = datetime.fromisoformat(publish_date)
-                blog_post.status = 'scheduled'
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use ISO format: YYYY-MM-DDTHH:MM:SS"}), 400
         else:
             blog_post.publish_date = None
-            blog_post.status = 'published'
 
         db.session.commit()
 
