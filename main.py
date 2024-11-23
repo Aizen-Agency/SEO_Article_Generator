@@ -488,7 +488,8 @@ def get_user_blogs(user):
                 "updated_content": blog.updated_content,
                 "status": blog.status,
                 "publish_date": blog.publish_date.isoformat() if blog.publish_date else None,
-                "created_at": blog.created_at.isoformat()
+                "created_at": blog.created_at.isoformat(),
+                "image_url": blog.image_url
             })
         
         return jsonify({
