@@ -553,6 +553,47 @@ def update_publish_date(user):
 
     except Exception as e:
         return jsonify({"error": f"Error updating publish date: {str(e)}"}), 500
+
+@app.route('/update-post-image', methods=['POST'])
+@token_required
+def update_post_image(user):
+    try:
+        post_id = request.form.get('post_id')
+        image = request.files.get('image')
+
+        if not post_id or not image:
+            return jsonify({"error": "Post ID and image are required"}), 400
+
+        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to update it"}), 404
+
+        # Define allowed file extensions for images
+        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+        def allowed_file(filename):
+            return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+        if image and allowed_file(image.filename):
+            filename = secure_filename(f'{user.username}_{post_id}_{datetime.now().timestamp()}.jpg')
+            try:
+                s3.upload_fileobj(
+                    image,
+                    app.config['S3_BUCKET'],
+                    filename,
+                    ExtraArgs={'ContentType': image.content_type}
+                )
+                image_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{filename}"
+                blog_post.image_url = image_url
+                db.session.commit()
+                return jsonify({"message": "Image updated successfully", "image_url": image_url}), 200
+            except Exception as e:
+                return jsonify({"error": f"Error uploading image to S3: {str(e)}"}), 500
+        else:
+            return jsonify({"error": "Invalid file type"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating post image: {str(e)}"}), 500
     
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
