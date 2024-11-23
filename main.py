@@ -522,6 +522,38 @@ def update_blog_content(user):
 
     except Exception as e:
         return jsonify({"error": f"Error updating blog content: {str(e)}"}), 500
+
+@app.route('/update-publish-date', methods=['POST'])
+@token_required
+def update_publish_date(user):
+    try:
+        data = request.get_json()
+        post_id = data.get('post_id')
+        publish_date = data.get('publish_date')
+
+        if not post_id:
+            return jsonify({"error": "Post ID is required"}), 400
+
+        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to update it"}), 404
+
+        if publish_date:
+            try:
+                blog_post.publish_date = datetime.fromisoformat(publish_date)
+                blog_post.status = 'scheduled'
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Use ISO format: YYYY-MM-DDTHH:MM:SS"}), 400
+        else:
+            blog_post.publish_date = None
+            blog_post.status = 'published'
+
+        db.session.commit()
+
+        return jsonify({"message": "Publish date updated successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating publish date: {str(e)}"}), 500
     
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
