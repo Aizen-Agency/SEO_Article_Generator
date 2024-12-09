@@ -88,6 +88,7 @@ def encode_auth_token(user_id):
             'iat': datetime.utcnow(),
             'sub': user_id
         }
+        print("SECRET_KEY", app.config['SECRET_KEY'])
         return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
     except Exception as e:
         return str(e)
@@ -106,6 +107,7 @@ def token_required(f):
         if not token:
             return jsonify({'error': 'Token is missing!'}), 401
         try:
+            token =token.strip()
             print(token)
             print(app.config['SECRET_KEY'])
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
