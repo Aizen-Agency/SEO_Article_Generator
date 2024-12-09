@@ -106,7 +106,9 @@ def token_required(f):
         if not token:
             return jsonify({'error': 'Token is missing!'}), 401
         try:
+            print(token)
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            print(payload)
             user_id = payload.get('sub')
             if not user_id:
                 return jsonify({'error': 'Invalid token. User ID missing in token payload'}), 401
