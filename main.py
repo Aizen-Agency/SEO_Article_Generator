@@ -120,8 +120,8 @@ def token_required(f):
                 return jsonify({'error': 'User not found'}), 404
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired!'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token!'}), 401
+        except jwt.InvalidTokenError as e:
+            return jsonify({'error': f'Invalid token! Reason: {str(e)}'}), 401
         return f(user, *args, **kwargs)
     return decorator
 
