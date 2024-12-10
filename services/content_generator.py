@@ -32,38 +32,16 @@ def generate_content(topic, keywords=[], tone="informative", style="blog", lengt
         prompt = f"Write a {tone} blog post about {topic} in a {style} style with {length} length. Also generate a catchy title for this blog post."
     else:
         prompt = f"{prompt}. Topic of blog post: {topic}"
-        
-    # Check if the prompt specifies a language
-    language = "English"  # Default language
-    if "in " in prompt:
-        parts = prompt.split("in ")
-        print("parts", parts)
-        if len(parts) > 1:
-            language_part = parts[1].split()[0]
-            print("language_part", language_part)
-            verification_prompt = f"Is '{language_part}' a language?"
-            verification_response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a language expert. Just answer 'yes' or 'no'."},
-                    {"role": "user", "content": verification_prompt},
-                ]
-            )
-            is_language = verification_response.choices[0].message.content.strip().lower() == 'yes'
-            if is_language:
-                language = language_part
 
     # Modify the prompt to include the language instruction
-    prompt = f"{prompt}. Write the blog post in {language}."
     print("prompt", prompt)
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that writes high-quality blog posts. Always start your response with a title on the first line followed by two newlines before the content. Do not use any special characters like asterisks or hashtags in the title or content."},
+            {"role": "system", "content": "You are a helpful assistant that writes high-quality blog posts in the specified language. Always start your response with a title on the first line followed by two newlines before the content. Do not use any special characters like asterisks or hashtags in the title or content."},
             {"role": "user", "content": prompt},
         ]
     )
-    
     response_text = response.choices[0].message.content
     
     # Split response into title and content
