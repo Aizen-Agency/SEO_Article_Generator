@@ -84,8 +84,8 @@ class BlogPost(db.Model):
 def encode_auth_token(user_id):
     try:
         payload = {
-            'exp': datetime.utcnow() + timedelta(hours=1),
-            'iat': datetime.utcnow(),
+            'exp': datetime.now(timezone.utc) + timedelta(hours=1),
+            'iat': datetime.now(timezone.utc),
             'sub': user_id
         }
         print("SECRET_KEY", app.config['SECRET_KEY'])
