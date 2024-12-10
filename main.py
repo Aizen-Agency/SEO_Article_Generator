@@ -86,7 +86,7 @@ def encode_auth_token(user_id):
         payload = {
             'exp': datetime.now(timezone.utc) + timedelta(hours=1),
             'iat': datetime.now(timezone.utc),
-            'sub': user_id
+            'sub': str(user_id)
         }
         print("SECRET_KEY", app.config['SECRET_KEY'])
         return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
@@ -114,7 +114,7 @@ def token_required(f):
             print(type(token))
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             print(payload)
-            user_id = payload.get('sub')
+            user_id = int(payload.get('sub'))
             if not user_id:
                 return jsonify({'error': 'Invalid token. User ID missing in token payload'}), 401
             user = User.query.get(user_id)
