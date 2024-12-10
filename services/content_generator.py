@@ -37,8 +37,10 @@ def generate_content(topic, keywords=[], tone="informative", style="blog", lengt
     language = "English"  # Default language
     if "in " in prompt:
         parts = prompt.split("in ")
+        print("parts", parts)
         if len(parts) > 1:
             language_part = parts[1].split()[0]
+            print("language_part", language_part)
             verification_prompt = f"Is '{language_part}' a language?"
             verification_response = client.chat.completions.create(
                 model="gpt-4o-mini",
