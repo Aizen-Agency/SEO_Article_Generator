@@ -110,6 +110,8 @@ def token_required(f):
             token =token.strip()
             print(token)
             print(app.config['SECRET_KEY'])
+            print(type(app.config['SECRET_KEY']))
+            print(type(token))
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             print(payload)
             user_id = payload.get('sub')
