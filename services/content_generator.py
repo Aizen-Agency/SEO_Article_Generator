@@ -53,6 +53,7 @@ def generate_content(topic, keywords=[], tone="informative", style="blog", lengt
 
     # Modify the prompt to include the language instruction
     prompt = f"{prompt}. Write the blog post in {language}."
+    print("prompt", prompt)
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
