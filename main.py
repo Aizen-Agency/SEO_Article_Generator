@@ -43,7 +43,7 @@ app.config['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 # Enable CORS globally with custom options
 CORS(app, 
     origins="*",                   # Allow all origins
-    methods=["GET", "POST", "PUT"],       # Allow only GET and POST requests
+    methods=["GET", "POST", "PUT", "DELETE"],       # Allow only GET and POST requests
     supports_credentials=True      # Allow credentials (e.g., cookies)
 )
 
