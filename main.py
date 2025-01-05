@@ -624,6 +624,44 @@ def delete_blog(user):
     except Exception as e:
         return jsonify({"error": f"Error deleting blog post: {str(e)}"}), 500
     
+@app.route('/update-profile-picture', methods=['POST'])
+@token_required
+def update_profile_picture(user):
+    try:
+        # Get the image file from the request
+        image = request.files.get('profile_pic')
+
+        if not image:
+            return jsonify({"error": "Profile picture is required"}), 400
+
+        # Define allowed file extensions for images
+        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+        def allowed_file(filename):
+            return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+        if image and allowed_file(image.filename):
+            # Secure the file name and upload to S3
+            filename = secure_filename(f'{user.username}_{datetime.now().timestamp()}.jpg')
+            try:
+                s3.upload_fileobj(
+                    image,
+                    app.config['S3_BUCKET'],
+                    filename,
+                    ExtraArgs={'ContentType': image.content_type}
+                )
+                profile_pic_url = f"https://{app.config['S3_BUCKET']}.s3.amazonaws.com/{filename}"
+                user.profile_pic_url = profile_pic_url
+                db.session.commit()
+                return jsonify({"message": "Profile picture updated successfully", "profile_pic_url": profile_pic_url}), 200
+            except Exception as e:
+                return jsonify({"error": f"Error uploading profile picture to S3: {str(e)}"}), 500
+        else:
+            return jsonify({"error": "Invalid file type"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating profile picture: {str(e)}"}), 500
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
