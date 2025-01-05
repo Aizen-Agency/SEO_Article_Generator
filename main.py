@@ -602,6 +602,28 @@ def update_post_image(user):
     except Exception as e:
         return jsonify({"error": f"Error updating post image: {str(e)}"}), 500
     
+@app.route('/delete-blog', methods=['DELETE'])
+@token_required
+def delete_blog(user):
+    try:
+        data = request.get_json()
+        post_id = data.get('post_id')
+
+        if not post_id:
+            return jsonify({"error": "Post ID is required"}), 400
+
+        blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to delete it"}), 404
+
+        db.session.delete(blog_post)
+        db.session.commit()
+
+        return jsonify({"message": "Blog post deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error deleting blog post: {str(e)}"}), 500
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
