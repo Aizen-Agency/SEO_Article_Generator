@@ -287,17 +287,16 @@ def get_blog_keywords(user):
 def approve_and_publish(user):
     data = request.get_json()
     post_id = data.get('post_id')
-    wordpress_account_id = data.get('wordpress_account_id')
 
     if not post_id:
         return jsonify({"error": "Post ID is required"}), 400
-
+    
     try:
         blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id, status='unapproved').first()
         if not blog_post:
             return jsonify({"error": "Unapproved blog post not found or you don't have permission to approve it"}), 404
 
-        account = WordPressAccount.query.filter_by(id=wordpress_account_id, user_id=user.id).first()
+        account = WordPressAccount.query.filter_by(id=blog_post.wordpress_account_id, user_id=user.id).first()
         if not account:
             return jsonify({"error": "WordPress account not found"}), 404
         
