@@ -80,6 +80,20 @@ class BlogPost(db.Model):
     publish_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     image_url = db.Column(db.String(255), nullable=True)
+    wordpress_account_id = db.Column(db.Integer, db.ForeignKey('wordpress_account.id'), nullable=True)  # New field
+
+# WordPressAccount model
+class WordPressAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    site_url = db.Column(db.String(255), nullable=False)
+    username = db.Column(db.String(255), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    account_name = db.Column(db.String(255), nullable=False)  # Friendly name for the account
+
+    def __repr__(self):
+        return f'<WordPressAccount {self.account_name}>'
+
 # Utility function to encode JWT token
 def encode_auth_token(user_id):
     try:
@@ -176,6 +190,7 @@ def generate_blog(user):
     publish_date_str = data.get('publish_date')
     keywords = user.keywords
     keywords = keywords.split(',') if keywords else []
+    account_id = data.get('account_id')  # New field for selecting WordPress account
 
     # Define allowed file extensions for images
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -226,7 +241,8 @@ def generate_blog(user):
             updated_content=updated_content,
             status='unapproved',
             publish_date=publish_date,
-            image_url=image_url
+            image_url=image_url,
+            wordpress_account_id=account_id  # Set the WordPress account ID
         )
         
         db.session.add(blog_post)
@@ -279,40 +295,30 @@ def approve_and_publish(user):
         if not blog_post:
             return jsonify({"error": "Unapproved blog post not found or you don't have permission to approve it"}), 404
 
-        if user.wordpress_site_url and user.wordpress_username and user.wordpress_password:
-            post_url = publish_to_wordpress(
-                title=blog_post.title,
-                content=blog_post.content,
-                wp_password=user.wordpress_password,
-                wp_site_url=user.wordpress_site_url,
-                wp_username=user.wordpress_username,
-                status="publish",
-                publish_date=blog_post.publish_date,
-                image_url=blog_post.image_url  # Send image_url to WordPress
-            )
-            if not post_url:
-                return jsonify({"error": "Failed to publish the blog to WordPress"}), 500
-            
-            if blog_post.publish_date:
-                blog_post.status = 'scheduled'
-            else:
-                blog_post.status = 'published'
-            db.session.commit()
-            
-            if blog_post.publish_date:
-                current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
-                if blog_post.publish_date.replace(tzinfo=timezone.utc) > current_time:
-                    delay = (blog_post.publish_date.replace(tzinfo=timezone.utc) - current_time).total_seconds()
-                else:
-                    delay = 0
-                # Schedule PostgreSQL trigger if publish_date exists
-                # Use threading to run the task
-                thread = threading.Thread(target=schedule_trigger_in_thread, args=(blog_post.id, delay))
-                thread.start()
+        account = WordPressAccount.query.filter_by(id=blog_post.wordpress_account_id, user_id=user.id).first()
+        if not account:
+            return jsonify({"error": "WordPress account not found"}), 404
 
-            return jsonify({"message": "Blog post approved and published successfully", "wordpress_url": post_url}), 200
+        post_url = publish_to_wordpress(
+            title=blog_post.title,
+            content=blog_post.content,
+            wp_password=account.password,
+            wp_site_url=account.site_url,
+            wp_username=account.username,
+            status="publish",
+            publish_date=blog_post.publish_date,
+            image_url=blog_post.image_url
+        )
+        if not post_url:
+            return jsonify({"error": "Failed to publish the blog to WordPress"}), 500
+
+        if blog_post.publish_date:
+            blog_post.status = 'scheduled'
         else:
-            return jsonify({"error": "WordPress credentials are missing"}), 400
+            blog_post.status = 'published'
+        db.session.commit()
+
+        return jsonify({"message": "Blog post approved and published successfully", "wordpress_url": post_url}), 200
 
     except Exception as e:
         return jsonify({"error": f"Error approving and publishing blog post: {str(e)}"}), 500
@@ -662,6 +668,74 @@ def update_profile_picture(user):
     except Exception as e:
         return jsonify({"error": f"Error updating profile picture: {str(e)}"}), 500
     
+@app.route('/user/wordpress-accounts', methods=['GET', 'POST', 'DELETE'])
+@token_required
+def manage_wordpress_accounts(user):
+    if request.method == 'GET':
+        accounts = WordPressAccount.query.filter_by(user_id=user.id).all()
+        return jsonify([{
+            "id": account.id,
+            "site_url": account.site_url,
+            "username": account.username,
+            "account_name": account.account_name
+        } for account in accounts]), 200
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        site_url = data.get('site_url')
+        username = data.get('username')
+        password = data.get('password')
+        account_name = data.get('account_name')
+
+        if not site_url or not username or not password or not account_name:
+            return jsonify({"error": "All fields are required"}), 400
+
+        new_account = WordPressAccount(
+            user_id=user.id,
+            site_url=site_url,
+            username=username,
+            password=password,
+            account_name=account_name
+        )
+        db.session.add(new_account)
+        db.session.commit()
+
+        return jsonify({"message": "WordPress account added successfully"}), 201
+
+    elif request.method == 'DELETE':
+        account_id = request.args.get('account_id')
+        account = WordPressAccount.query.filter_by(id=account_id, user_id=user.id).first()
+        if not account:
+            return jsonify({"error": "WordPress account not found"}), 404
+
+        db.session.delete(account)
+        db.session.commit()
+
+        return jsonify({"message": "WordPress account deleted successfully"}), 200
+
+@app.route('/update-blog-account', methods=['PUT'])
+@token_required
+def update_blog_account(user):
+    try:
+        data = request.get_json()
+        blog_id = data.get('post_id')
+        account_id = data.get('account_id')
+
+        if not blog_id or not account_id:
+            return jsonify({"error": "Blog ID and account ID are required"}), 400
+
+        blog_post = BlogPost.query.filter_by(id=blog_id, user_id=user.id).first()
+        if not blog_post:
+            return jsonify({"error": "Blog post not found or you don't have permission to update it"}), 404
+
+        blog_post.wordpress_account_id = account_id
+        db.session.commit()
+
+        return jsonify({"message": "WordPress account updated successfully for the blog post"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating WordPress account for blog post: {str(e)}"}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
