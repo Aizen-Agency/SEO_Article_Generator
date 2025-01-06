@@ -65,6 +65,7 @@ class User(db.Model):
     wordpress_username = db.Column(db.String(255), nullable=True)
     wordpress_password = db.Column(db.String(255), nullable=True)
     keywords = db.Column(db.String(255), nullable=True)
+    prompt = db.Column(db.Text, nullable=True)  # New field for storing the prompt
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -741,6 +742,30 @@ def update_blog_account(user):
 
     except Exception as e:
         return jsonify({"error": f"Error updating WordPress account for blog post: {str(e)}"}), 500
+
+@app.route('/user/prompt', methods=['POST', 'PUT'])
+@token_required
+def save_or_update_prompt(user):
+    data = request.get_json()
+    prompt = data.get('prompt')
+
+    if not prompt:
+        return jsonify({"error": "Prompt is required"}), 400
+
+    try:
+        user.prompt = prompt
+        db.session.commit()
+        return jsonify({"message": "Prompt saved successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error saving prompt: {str(e)}"}), 500
+
+@app.route('/user/prompt', methods=['GET'])
+@token_required
+def get_prompt(user):
+    try:
+        return jsonify({"prompt": user.prompt}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error retrieving prompt: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
