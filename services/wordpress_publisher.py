@@ -23,6 +23,7 @@ def publish_to_wordpress(title, content, wp_site_url, wp_username, wp_password, 
     Returns:
         str: The URL of the published or scheduled post.
     """
+    print(f"Publishing to WordPress: {wp_site_url}, {wp_username}, {wp_password}")
     # Create a WordPress client
     wp = Client(wp_site_url, wp_username, wp_password)
     
