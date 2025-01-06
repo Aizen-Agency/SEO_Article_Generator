@@ -80,7 +80,7 @@ class BlogPost(db.Model):
     publish_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     image_url = db.Column(db.String(255), nullable=True)
-    wordpress_account_id = db.Column(db.Integer, db.ForeignKey('wordpress_account.id'), nullable=True)  # New field
+    wordpress_account_id = db.Column(db.Integer, db.ForeignKey('word_press_account.id'), nullable=True)  # New field
 
 # WordPressAccount model
 class WordPressAccount(db.Model):
