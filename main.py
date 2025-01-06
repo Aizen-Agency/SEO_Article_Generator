@@ -290,7 +290,7 @@ def approve_and_publish(user):
 
     if not post_id:
         return jsonify({"error": "Post ID is required"}), 400
-    
+
     try:
         blog_post = BlogPost.query.filter_by(id=post_id, user_id=user.id, status='unapproved').first()
         if not blog_post:
@@ -300,10 +300,7 @@ def approve_and_publish(user):
         if not account:
             return jsonify({"error": "WordPress account not found"}), 404
         
-        print(account.id)
-        print(account.account_name)
-        print(account.username)
-        print(account.password)
+        print(blog_post.publish_date)
 
         post_url = publish_to_wordpress(
             title=blog_post.title,
