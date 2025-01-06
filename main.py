@@ -700,7 +700,12 @@ def manage_wordpress_accounts(user):
         db.session.add(new_account)
         db.session.commit()
 
-        return jsonify({"message": "WordPress account added successfully"}), 201
+        return jsonify({
+            "id": new_account.id,
+            "site_url": new_account.site_url,
+            "username": new_account.username,
+            "account_name": new_account.account_name
+        }), 201
 
     elif request.method == 'DELETE':
         account_id = request.args.get('account_id')
