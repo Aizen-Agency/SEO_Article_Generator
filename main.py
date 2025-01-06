@@ -299,6 +299,11 @@ def approve_and_publish(user):
         account = WordPressAccount.query.filter_by(id=blog_post.wordpress_account_id, user_id=user.id).first()
         if not account:
             return jsonify({"error": "WordPress account not found"}), 404
+        
+        print(account.id)
+        print(account.account_name)
+        print(account.username)
+        print(account.password)
 
         post_url = publish_to_wordpress(
             title=blog_post.title,
